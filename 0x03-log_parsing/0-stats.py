@@ -1,72 +1,50 @@
 #!/usr/bin/python3
 """
-    A Script to parse logs from stdin and return formatted output
+log parsing
 """
+
 import sys
-import signal
-
-total_file_size = 0
-list_of_codes = [200, 301, 499, 401, 403, 404, 405, 500]
-status_codes = {str(code): 0 for code in list_of_codes}
-line_count = 0
+import re
 
 
-def print_stats():
-    """ Prints the output to the screen """
-    global total_file_size
-    global status_codes
-
-    print(f"File size: {total_file_size}")
-    for code in sorted(status_codes):
-        if status_codes[code] > 0:
-            print(f"{code}:{status_codes[code]}")
-
-
-def signal_handler(signal, frame):
-    """ Handle Keyboard interrupt Ctrl+c """
-    print_stats()
-    sys.exit(0)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-
-
-def run():
-    """ Main entry point to program """
-
-    global total_file_size
-    global status_codes
-    global line_count
-
-    try:
-        for line in sys.stdin:
-            parts = line.split()
-            if len(parts) < 9:
-                continue
-
-            status_code = parts[7]
-            file_size = parts[8]
-
-            try:
-                status_code = str(status_code)
-                file_size = int(file_size)
-            except ValueError:
-                continue
-
-            if status_code in status_codes:
-                status_codes[status_code] += 1
-
-            total_file_size += file_size
-
-            line_count += 1
-
-            if line_count % 10 == 0:
-                print_stats()
-        print_stats()
-
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+def output(log: dict) -> None:
+    """
+    helper function to display stats
+    """
+    print("File size: {}".format(log["file_size"]))
+    for code in sorted(log["code_frequency"]):
+        if log["code_frequency"][code]:
+            print("{}: {}".format(code, log["code_frequency"][code]))
 
 
 if __name__ == "__main__":
-    run()
+    regex = re.compile(
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} - \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d+\] "GET /projects/260 HTTP/1.1" (.{3}) (\d+)')  # nopep8
+
+    line_count = 0
+    log = {}
+    log["file_size"] = 0
+    log["code_frequency"] = {
+        str(code): 0 for code in [
+            200, 301, 400, 401, 403, 404, 405, 500]}
+
+    try:
+        for line in sys.stdin:
+            line = line.strip()
+            match = regex.fullmatch(line)
+            if (match):
+                line_count += 1
+                code = match.group(1)
+                file_size = int(match.group(2))
+
+                # File size
+                log["file_size"] += file_size
+
+                # status code
+                if (code.isdecimal()):
+                    log["code_frequency"][code] += 1
+
+                if (line_count % 10 == 0):
+                    output(log)
+    finally:
+        output(log)
