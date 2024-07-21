@@ -1,93 +1,66 @@
 #!/usr/bin/python3
-'''
-The script for parsing HTTP request logs.
-'''
+"""
+    A Script to parse logs from stdin and return formatted output
+"""
+import sys
 import re
+import signal
+
+total_file_size = 0
+list_of_codes = [200, 301, 499, 401, 403, 404, 405, 500]
+status_codes = {code: 0 for code in list_of_codes}
+line_count = 0
+
+pattern = re.compile(
+    r'\s*(?P<ip>\S+)\s*'
+    r'\s*\[(?P<date>\d+\-\d+\-\d+ \d+:\d+:\d+\.\d+)\]'
+    r'\s*"(?P<request>[^"]*)"\s*'
+    r'\s*(?P<status_code>\d+)\s*'
+    r'\s*(?P<file_size>\d+)'
+)
 
 
-def extract_input(input_line):
-    '''
-    Extracts sections of a line of an HTTP request log.
-    '''
-    fp = (
-        r'\s*(?P<ip>\S+)\s*',
-        r'\s*\[(?P<date>\d+\-\d+\-\d+ \d+:\d+:\d+\.\d+)\]',
-        r'\s*"(?P<request>[^"]*)"\s*',
-        r'\s*(?P<status_code>\S+)',
-        r'\s*(?P<file_size>\d+)'
-    )
-    info = {
-        'status_code': 0,
-        'file_size': 0,
-    }
-    log_fmt = '{}\\-{}{}{}{}\\s*'.format(fp[0], fp[1], fp[2], fp[3], fp[4])
-    resp_match = re.fullmatch(log_fmt, input_line)
-    if resp_match is not None:
-        status_code = resp_match.group('status_code')
-        file_size = int(resp_match.group('file_size'))
-        info['status_code'] = status_code
-        info['file_size'] = file_size
-    return info
+def print_stats():
+    """ Prints the output to the screen """
+    global total_file_size
+    global status_codes
+
+    print(f"File size: {total_file_size}")
+    for code in sorted(status_codes):
+        if status_codes[code] > 0:
+            print(f"{code}:{status_codes[code]}")
 
 
-def print_statistics(total_file_size, status_codes_stats):
-    '''
-    This prints the accumulated statistics of the HTTP request log.
-    '''
-    print('File size: {:d}'.format(total_file_size), flush=True)
-    for status_code in sorted(status_codes_stats.keys()):
-        num = status_codes_stats.get(status_code, 0)
-        if num > 0:
-            print('{:s}: {:d}'.format(status_code, num), flush=True)
+def signal_handler(signal, frame):
+    """ Handle Keyboard interrupt Ctrl+c """
+    print_stats()
+    sys.exit(0)
 
 
-def update_metrics(line, total_file_size, status_codes_stats):
-    '''
-    Updates the metrics from a given HTTP request log.
-
-    Args:
-        line (str): The line of input from which to retrieve the metrics.
-
-    Returns:
-        int: The new total file size.
-    '''
-    line_info = extract_input(line)
-    status_code = line_info.get('status_code', '0')
-    if status_code in status_codes_stats.keys():
-        status_codes_stats[status_code] += 1
-    return total_file_size + line_info['file_size']
+signal.signal(signal.SIGINT, signal_handler)
 
 
-def run():
-    '''
-    This starts the log parser.
-    '''
-    line_num = 0
-    total_file_size = 0
-    status_codes_stats = {
-        '200': 0,
-        '301': 0,
-        '400': 0,
-        '401': 0,
-        '403': 0,
-        '404': 0,
-        '405': 0,
-        '500': 0,
-    }
-    try:
-        while True:
-            line = input()
-            total_file_size = update_metrics(
-                line,
-                total_file_size,
-                status_codes_stats,
-            )
-            line_num += 1
-            if line_num % 10 == 0:
-                print_statistics(total_file_size, status_codes_stats)
-    except (KeyboardInterrupt, EOFError):
-        print_statistics(total_file_size, status_codes_stats)
+try:
+    for line in sys.stdin:
+        parts = line.split()
+        protocol = parts[6][:-1]
+        status_code = parts[7]
+        file_size = parts[8]
+        # print(protocol, status_code, file_size)
 
+        try:
+            status_code = int(status_code)
+            file_size = int(file_size)
+        except ValueError:
+            continue
 
-if __name__ == '__main__':
-    run()
+        if status_code in status_codes:
+            status_codes[status_code] += 1
+        total_file_size += file_size
+
+        line_count += 1
+
+        if line_count % 10 == 0:
+            print_stats()
+except Exception as e:
+    print(str(e))
