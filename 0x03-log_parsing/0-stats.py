@@ -7,7 +7,7 @@ import signal
 
 total_file_size = 0
 list_of_codes = [200, 301, 499, 401, 403, 404, 405, 500]
-status_codes = {code: 0 for code in list_of_codes}
+status_codes = {str(code): 0 for code in list_of_codes}
 line_count = 0
 
 
@@ -48,7 +48,7 @@ def run():
             file_size = parts[8]
 
             try:
-                status_code = int(status_code)
+                status_code = str(status_code)
                 file_size = int(file_size)
             except ValueError:
                 continue
