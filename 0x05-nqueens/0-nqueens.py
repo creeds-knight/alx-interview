@@ -52,7 +52,7 @@ if __name__ == "__main__":
     if not isinstance(N, int):
         print("N must be a number")
         sys.exit(1)
-    else if N < 4:
+    elif N < 4:
         print("N must be at least 4")
         sys.exit(1)
 
