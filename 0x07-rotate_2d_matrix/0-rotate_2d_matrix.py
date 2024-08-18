@@ -1,6 +1,4 @@
 #!/usr/bin/python3
-
-
 """
 2D matrix rotation module.
 """
